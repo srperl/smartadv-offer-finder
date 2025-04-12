@@ -5,81 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SmartADV Offer Finder</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 30px;
-      background: #f9f9f9;
-    }
-    h1 {
-      color: #ff6600;
-    }
-    select, button {
-      margin: 10px;
-      padding: 10px;
-      font-size: 1rem;
-    }
-    .results {
-      margin-top: 30px;
-      padding: 20px;
-      background: white;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-    }
+    body { font-family: Arial; padding: 20px; }
+    .offer { border: 1px solid #ccc; padding: 15px; margin-bottom: 10px; border-radius: 8px; }
   </style>
 </head>
 <body>
-  <h1>SmartADV Offer Finder 🔎</h1>
 
-  <label for="category">Category:</label>
-  <select id="category">
-    <option value="">All</option>
-    <option value="CBD">CBD</option>
-    <option value="Health">Health</option>
-    <option value="Finance">Finance</option>
-    <option value="Dating">Dating</option>
-    <option value="Gaming">Gaming</option>
-  </select>
-
-  <label for="country">Country:</label>
-  <select id="country">
-    <option value="">All</option>
-    <option value="US">US</option>
-    <option value="UK">UK</option>
-    <option value="CA">CA</option>
-    <option value="DE">DE</option>
-    <option value="AU">AU</option>
-  </select>
-
-  <label for="payout">Payout:</label>
-  <select id="payout">
-    <option value="">All</option>
-    <option value="0-50">0–50</option>
-    <option value="50-100">50–100</option>
-    <option value="100+">100+</option>
-  </select>
-
-  <button onclick="generateResults()">🔍 Find Offers</button>
-
-  <div class="results" id="results">
-    <p>No results yet. Choose filters above and click "Find Offers".</p>
-  </div>
+  <h1>🔥 SmartADV Live Offers</h1>
+  <div id="offers">Loading offers...</div>
 
   <script>
-    function generateResults() {
-      const category = document.getElementById("category").value;
-      const country = document.getElementById("country").value;
-      const payout = document.getElementById("payout").value;
+    const airtableApiKey = "YOUR_API_KEY";  // Replace
+    const baseId = "YOUR_BASE_ID";          // Replace
+    const tableName = "YOUR_TABLE_NAME";    // Replace
 
-      document.getElementById("results").innerHTML = `
-        <h3>Showing Offers for:</h3>
-        <ul>
-          <li><strong>Category:</strong> ${category || "All"}</li>
-          <li><strong>Country:</strong> ${country || "All"}</li>
-          <li><strong>Payout:</strong> ${payout || "All"}</li>
-        </ul>
-        <p>📦 Offer results would appear here from your GPT + Airtable matching logic!</p>
-      `;
-    }
+    fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=15&view=Grid%20view`, {
+      headers: {
+        Authorization: `Bearer ${airtableApiKey}`
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      const container = document.getElementById('offers');
+      container.innerHTML = "";
+      data.records.forEach(record => {
+        const fields = record.fields;
+        container.innerHTML += `
+          <div class="offer">
+            <h3>${fields["Offer Name"] || "No Name"}</h3>
+            <p><strong>Category:</strong> ${fields["Category"] || "-"}</p>
+            <p><strong>Payout:</strong> $${fields["Payout"] || "-"}</p>
+            <p><a href="${fields["Portal Link"] || '#'}" target="_blank">Apply</a></p>
+          </div>
+        `;
+      });
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById('offers').innerHTML = "<p>Error loading offers.</p>";
+    });
   </script>
 </body>
 </html>
