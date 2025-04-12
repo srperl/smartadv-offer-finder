@@ -12,7 +12,7 @@
       color: #1a1a1a;
     }
     h1 {
-      color: #0070f3;
+      color: #00a4e4;
       text-align: center;
       margin-bottom: 30px;
     }
@@ -20,93 +20,101 @@
       margin-bottom: 30px;
       display: flex;
       flex-wrap: wrap;
-      gap: 15px;
+      gap: 10px;
       justify-content: center;
     }
-    select, input[type="text"] {
-      padding: 10px;
+    .filters select, .filters input[type="text"] {
+      padding: 8px 10px;
       font-size: 14px;
       border: 1px solid #ccc;
       border-radius: 6px;
+      min-width: 160px;
     }
-    .offer-section {
-      margin-top: 40px;
+    #aiSuggestBtn {
+      background-image: linear-gradient(to right, #0070f3, #a200ff);
+      color: white;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      cursor: pointer;
     }
-    .offer-section h2 {
-      color: #333;
-      margin-bottom: 15px;
-      font-size: 1.5rem;
-      border-bottom: 2px solid #eee;
-      padding-bottom: 5px;
+    .offer-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
     }
     .offer-card {
-      background-color: #f9f9f9;
-      padding: 15px;
-      margin-bottom: 20px;
+      padding: 10px;
       border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-      display: flex;
-      align-items: flex-start;
-      gap: 15px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+      font-size: 13px;
+      background-color: #f4f9fb;
     }
+    .offer-card[data-category*="Diet"] { background-color: #fff4e6; }
+    .offer-card[data-category*="Health"] { background-color: #e6f9f1; }
+    .offer-card[data-category*="Beauty"] { background-color: #fce6f3; }
+    .offer-card[data-category*="Ecomm"] { background-color: #e6f0ff; }
+
     .offer-card img {
-      width: 120px;
-      height: auto;
+      width: 100%;
+      max-height: 100px;
+      object-fit: cover;
       border-radius: 6px;
-    }
-    .offer-content {
-      flex: 1;
+      margin-bottom: 6px;
     }
     .offer-content h3 {
       margin: 0;
-      color: #0070f3;
-      font-size: 1.2rem;
+      color: #00a4e4;
+      font-size: 1rem;
     }
     .highlight {
       font-style: italic;
-      margin: 10px 0;
-      color: #666;
-    }
-    .offer-content p {
-      margin: 5px 0;
+      margin: 4px 0;
+      color: #15803d;
+      font-weight: bold;
     }
     .apply-link {
       display: inline-block;
-      margin-top: 10px;
+      margin-top: 4px;
       color: #fff;
-      background-color: #0070f3;
-      padding: 6px 12px;
+      background-color: #f26522;
+      padding: 4px 8px;
       border-radius: 4px;
       text-decoration: none;
       font-weight: 600;
+      font-size: 13px;
     }
-    .tags {
-      margin-top: 5px;
-      font-size: 12px;
-      color: #fff;
-      background: #28a745;
-      padding: 4px 6px;
-      border-radius: 3px;
-      display: inline-block;
+    .pagination {
+      text-align: center;
+      margin-top: 20px;
     }
-    .copy-btn {
-      margin-left: 10px;
-      background: #e0e0e0;
+    .pagination button {
+      background-color: #00a4e4;
       border: none;
-      padding: 4px 6px;
-      font-size: 12px;
+      color: white;
+      padding: 6px 10px;
+      margin: 0 3px;
+      border-radius: 4px;
+      font-weight: bold;
       cursor: pointer;
-      border-radius: 3px;
+    }
+    .pagination button[disabled] {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    .channels, .offer-id {
+      font-size: 13px;
+      margin-bottom: 2px;
     }
   </style>
 </head>
 <body>
   <h1>SmartADV Offer Finder</h1>
-
   <div class="filters">
-    <select id="categoryFilter" multiple size="5"></select>
-    <select id="channelFilter" multiple size="5"></select>
-    <select id="countryFilter" multiple size="5"></select>
+    <select id="categoryFilter" multiple size="4"></select>
+    <select id="channelFilter" multiple size="4"></select>
+    <select id="countryFilter" multiple size="4"></select>
     <select id="payoutFilter">
       <option value="">Any Payout</option>
       <option value="low">Under $50</option>
@@ -120,128 +128,173 @@
       <option value="epc-high">EPC: High to Low</option>
     </select>
     <input type="text" id="searchInput" placeholder="Search keyword..." />
+    <button id="aiSuggestBtn">🔍 AI Matched Offers</button>
   </div>
-
-  <div id="offers">Loading offers...</div>
+  <div id="offers" class="offer-grid">Please wait while we load the offers...</div>
+  <div class="pagination" id="pagination"></div>
 
   <script>
     const apiKey = 'patnPgIMAMI9ZXwum.7860eff03b9c59d78ad536532edb41bd347c6900e8f9724681452fd68757097a';
     const baseId = 'app12gesbScGlSR9r';
     const tableName = 'Imported table';
+    const perPage = 12;
+    let offers = [], currentPage = 1;
 
-    fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=50&filterByFormula={test subset}=1`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    })
-      .then(res => res.json())
-      .then(data => {
-        const container = document.getElementById('offers');
-        const categoryFilter = document.getElementById('categoryFilter');
-        const channelFilter = document.getElementById('channelFilter');
-        const countryFilter = document.getElementById('countryFilter');
-        const payoutFilter = document.getElementById('payoutFilter');
-        const sortFilter = document.getElementById('sortFilter');
-        const searchInput = document.getElementById('searchInput');
+    const filters = {
+      category: document.getElementById('categoryFilter'),
+      channel: document.getElementById('channelFilter'),
+      country: document.getElementById('countryFilter'),
+      payout: document.getElementById('payoutFilter'),
+      sort: document.getElementById('sortFilter'),
+      search: document.getElementById('searchInput')
+    };
 
-        const offers = data.records || [];
-        const categories = new Set();
-        const channels = new Set();
-        const countries = new Set();
-
-        offers.forEach(r => {
-          (r.fields.Category || []).forEach(c => categories.add(c));
-          (r.fields.Channels || []).forEach(c => channels.add(c));
-          (r.fields.Countries || []).forEach(c => countries.add(c));
+    async function fetchData() {
+      const allRecords = [];
+      let offset = '';
+      do {
+        const res = await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?pageSize=100&filterByFormula={test subset}=1${offset ? `&offset=${offset}` : ''}`, {
+          headers: { Authorization: `Bearer ${apiKey}` }
         });
+        const json = await res.json();
+        allRecords.push(...json.records);
+        offset = json.offset;
+      } while (offset);
+      return allRecords;
+    }
 
-        categories.forEach(c => categoryFilter.innerHTML += `<option value="${c}">${c}</option>`);
-        channels.forEach(c => channelFilter.innerHTML += `<option value="${c}">${c}</option>`);
-        countries.forEach(c => countryFilter.innerHTML += `<option value="${c}">${c}</option>`);
+    function generateHighlight(f, index) {
+      const highlights = [
+        '🔥 Hot offer affiliates love!',
+        '💸 Fat EPCs, zero fluff.',
+        '🚀 Trending & converting fast!',
+        '🎯 Target locked: high ROI.',
+        '🤑 Consistent top performer!',
+        '🌎 Geo-friendly money maker.',
+        '💥 Massive click-through surge!',
+        '🔒 Top payout & great control.',
+        '📊 Built for scale. Let’s go!',
+        '🚨 Don’t miss this sleeper hit!'
+      ];
+      return highlights[index % highlights.length];
+    }
 
-        function generateHighlight(f) {
-          const epc = parseFloat(f.EPC || 0);
-          const payout = parseFloat(f.Payout || 0);
-          const terms = f['Terms and Conditions'] || '';
-          if (epc > 1.5) return '💸 EPC crushing it! High return for every click!';
-          if (payout > 100) return '💰 Big bounty alert! Over $100 per conversion!';
-          if (terms.includes('no brand bidding')) return '⚠️ Strict compliance, but high reward!';
-          if (f['Top Performer']) return '🔥 A proven top performer. Don’t miss out!';
-          return '🎯 Solid offer with strong metrics. Perfect for scaling.';
-        }
-
-        function renderOffers() {
-          const cat = Array.from(categoryFilter.selectedOptions).map(o => o.value);
-          const chan = Array.from(channelFilter.selectedOptions).map(o => o.value);
-          const geo = Array.from(countryFilter.selectedOptions).map(o => o.value);
-          const keyword = searchInput.value.toLowerCase();
-          const payout = payoutFilter.value;
-          const sort = sortFilter.value;
-
-          const filtered = offers.filter(r => {
-            const f = r.fields;
-            const matchCategory = !cat.length || cat.some(c => (f.Category || []).includes(c));
-            const matchChannel = !chan.length || chan.some(c => (f.Channels || []).includes(c));
-            const matchCountry = !geo.length || geo.some(c => (f.Countries || []).includes(c));
-            const matchKeyword = !keyword || (f.Name || '').toLowerCase().includes(keyword) || (f.Description || '').toLowerCase().includes(keyword);
-            const payoutValue = parseFloat(f.Payout || 0);
-            const matchPayout = !payout ||
-              (payout === 'low' && payoutValue < 50) ||
-              (payout === 'mid' && payoutValue >= 50 && payoutValue <= 100) ||
-              (payout === 'high' && payoutValue > 100);
-            return matchCategory && matchChannel && matchCountry && matchKeyword && matchPayout;
-          });
-
-          if (sort === 'payout-high') filtered.sort((a, b) => (parseFloat(b.fields.Payout || 0)) - (parseFloat(a.fields.Payout || 0)));
-          else if (sort === 'payout-low') filtered.sort((a, b) => (parseFloat(a.fields.Payout || 0)) - (parseFloat(b.fields.Payout || 0)));
-          else if (sort === 'epc-high') filtered.sort((a, b) => (parseFloat(b.fields.EPC || 0)) - (parseFloat(a.fields.EPC || 0)));
-
-          const grouped = {};
-          filtered.forEach(r => {
-            const group = (r.fields.Category || ['Uncategorized'])[0];
-            if (!grouped[group]) grouped[group] = [];
-            grouped[group].push(r);
-          });
-
-          container.innerHTML = Object.entries(grouped).map(([cat, list]) => {
-            return `<div class="offer-section">
-              <h2>${cat}</h2>
-              ${list.map(record => {
-                const f = record.fields;
-                const tag = f["Brand Bidding Only"] ? `<span class="tags">Brand Bidding ✅</span>` : '';
-                const top = f["Top Performer"] ? `<span class="tags" style="background:#ff5722">🔥 Top Performer</span>` : '';
-                const epc = f.EPC ? `<p><strong>EPC:</strong> $${f.EPC}</p>` : '';
-                const highlightLine = generateHighlight(f);
-                return `
-                  <div class="offer-card">
-                    <img src="${f['thumbnail url'] || ''}" alt="${f.Name}" />
-                    <div class="offer-content">
-                      <h3>${f.Name || 'Unnamed Offer'}</h3>
-                      <p><strong>Category:</strong> ${f.Category?.join(', ') || 'N/A'}</p>
-                      <p><strong>Payout:</strong> $${f.Payout || 'N/A'}</p>
-                      <p><strong>GEOs:</strong> ${f.Countries?.join(', ') || 'N/A'}</p>
-                      <p class="highlight">${highlightLine}</p>
-                      ${epc} ${tag} ${top}
-                      <div>
-                        <a class="apply-link" href="${f['Portal Link']}" target="_blank">Apply Now</a>
-                        <button class="copy-btn" onclick="navigator.clipboard.writeText('${f['Portal Link']}')">📋 Copy</button>
-                      </div>
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>`;
-          }).join('');
-        }
-
-        [categoryFilter, channelFilter, countryFilter, searchInput, payoutFilter, sortFilter].forEach(input => {
-          input.addEventListener('input', renderOffers);
-        });
-
-        renderOffers();
-      })
-      .catch(err => {
-        document.getElementById('offers').innerHTML = "⚠️ Error loading offers.";
-        console.error(err);
+    function applyFilters(data) {
+      return data.filter(r => {
+        const f = r.fields;
+        const catMatch = matchMulti(f.Category, [...filters.category.selectedOptions].map(o => o.value));
+        const chanMatch = matchMulti(f.Channels, [...filters.channel.selectedOptions].map(o => o.value));
+        const geoMatch = matchMulti(f.Countries, [...filters.country.selectedOptions].map(o => o.value));
+        const keyword = filters.search.value.toLowerCase();
+        const kwMatch = !keyword || f.Name?.toLowerCase().includes(keyword) || f.Description?.toLowerCase().includes(keyword);
+        const payoutValue = parseFloat(f.Payout || 0);
+        const payoutMatch = !filters.payout.value ||
+          (filters.payout.value === 'low' && payoutValue < 50) ||
+          (filters.payout.value === 'mid' && payoutValue >= 50 && payoutValue <= 100) ||
+          (filters.payout.value === 'high' && payoutValue > 100);
+        return catMatch && chanMatch && geoMatch && kwMatch && payoutMatch;
       });
+    }
+
+    function matchMulti(data = [], selected = []) {
+      if (selected.length === 0) return true;
+      return data?.some(val => selected.includes(val));
+    }
+
+    function sortOffers(data) {
+      const sort = filters.sort.value;
+      if (sort === 'payout-high') return data.sort((a, b) => b.fields.Payout - a.fields.Payout);
+      if (sort === 'payout-low') return data.sort((a, b) => a.fields.Payout - b.fields.Payout);
+      if (sort === 'epc-high') return data.sort((a, b) => b.fields.EPC - a.fields.EPC);
+      return data;
+    }
+
+    function renderOffers(data) {
+      const container = document.getElementById('offers');
+      const start = (currentPage - 1) * perPage;
+      const paginated = data.slice(start, start + perPage);
+      container.innerHTML = paginated.map((r, i) => {
+        const f = r.fields;
+        const img = f['thumbnail url'] || 'https://via.placeholder.com/300x150?text=SmartADV';
+        const name = (f.Name || '').replace(/\(.*?\)/g, '').trim();
+        const highlight = generateHighlight(f, i + start);
+        const brandBidding = f['Brand Bidding Only'] ? '✅ Brand Bidding' : '🚫 No Brand Bidding';
+
+        return `
+          <div class="offer-card" data-category="${f.Category?.join(', ') || ''}">
+            <img src="${img}" alt="${name}" />
+            <div class="offer-content">
+              <div class="offer-id">#${f['Offer ID'] || ''} - ${name}</div>
+              <p><strong>Payout:</strong> $${f.Payout || 'N/A'}</p>
+              <p><strong>GEOs:</strong> ${f.Countries?.join(', ') || 'N/A'}</p>
+              <p><strong>Channels:</strong> ${f.Channels?.join(', ') || 'N/A'} — ${brandBidding}</p>
+              <p class="highlight">${highlight}</p>
+              <a class="apply-link" href="${f['Portal Link']}" target="_blank">Apply Now</a>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setupPagination(total, onPageChange) {
+      const pages = Math.ceil(total / perPage);
+      const container = document.getElementById('pagination');
+      container.innerHTML = '';
+      for (let i = 1; i <= pages; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        btn.disabled = i === currentPage;
+        btn.onclick = () => {
+          currentPage = i;
+          onPageChange();
+        };
+        container.appendChild(btn);
+      }
+    }
+
+    function update() {
+      const filtered = applyFilters(offers);
+      const sorted = sortOffers(filtered);
+      renderOffers(sorted);
+      setupPagination(sorted.length, update);
+    }
+
+    filters.category.addEventListener('change', update);
+    filters.channel.addEventListener('change', update);
+    filters.country.addEventListener('change', update);
+    filters.search.addEventListener('input', update);
+    filters.payout.addEventListener('change', update);
+    filters.sort.addEventListener('change', update);
+
+    document.getElementById('aiSuggestBtn').addEventListener('click', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const id = urlParams.get('affiliateId') || 'unknown';
+      alert(`🤖 Smart match using affiliate ID: ${id}. Based on your preferences, these are 🔥 right now! (Future: real-time profile data here)`);
+    });
+
+    fetchData().then(data => {
+      offers = data;
+
+      const sets = { category: new Set(), channel: new Set(), country: new Set() };
+      offers.forEach(r => {
+        (r.fields.Category || []).forEach(val => sets.category.add(val));
+        (r.fields.Channels || []).forEach(val => sets.channel.add(val));
+        (r.fields.Countries || []).forEach(val => sets.country.add(val));
+      });
+
+      for (const [type, set] of Object.entries(sets)) {
+        const el = filters[type];
+        [...set].sort().forEach(val => {
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = val;
+          el.appendChild(opt);
+        });
+      }
+
+      update();
+    });
   </script>
 </body>
 </html>
+
