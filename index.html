@@ -6,83 +6,111 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
+      background-color: #f8f9fa;
       padding: 20px;
     }
     h1 {
       color: #333;
+      text-align: center;
     }
     .filters {
-      margin-bottom: 20px;
+      margin-bottom: 30px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
     }
-    select, button {
+    select, input[type="text"] {
       padding: 8px;
-      margin-right: 10px;
+      font-size: 14px;
     }
-    .offer {
-      background-color: white;
-      border-radius: 8px;
+    .offer-card {
+      background-color: #fff;
       padding: 15px;
       margin-bottom: 20px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       display: flex;
+      align-items: flex-start;
       gap: 15px;
     }
-    .offer img {
+    .offer-card img {
       width: 120px;
       height: auto;
-      border-radius: 4px;
+      border-radius: 6px;
     }
-    .offer-info {
+    .offer-content {
       flex: 1;
     }
-    .offer h3 {
-      margin: 0 0 10px;
-      color: #222;
+    .offer-content h3 {
+      margin-top: 0;
+      color: #0070f3;
     }
-    .offer p {
+    .highlight {
+      font-style: italic;
+      margin-bottom: 10px;
+    }
+    .offer-content p {
       margin: 5px 0;
     }
-    .offer a {
+    .apply-link {
       display: inline-block;
       margin-top: 10px;
-      color: #fff;
-      background: #0073e6;
-      padding: 8px 12px;
-      text-decoration: none;
+      color: white;
+      background-color: #0070f3;
+      padding: 6px 12px;
       border-radius: 4px;
+      text-decoration: none;
+      font-weight: bold;
     }
-    .offer a:hover {
-      background: #005bb5;
+    .tags {
+      margin-top: 5px;
+      font-size: 12px;
+      color: #fff;
+      background: #28a745;
+      padding: 4px 6px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .copy-btn {
+      margin-left: 10px;
+      background: #ccc;
+      border: none;
+      padding: 4px 6px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 3px;
     }
   </style>
 </head>
 <body>
   <h1>SmartADV Offer Finder</h1>
+
   <div class="filters">
-    <select id="categorySelect">
+    <select id="categoryFilter">
       <option value="">All Categories</option>
-      <option value="Health">Health</option>
-      <option value="Beauty">Beauty</option>
-      <option value="Diet">Diet</option>
-      <option value="Ecommerce">Ecommerce</option>
     </select>
-    <select id="channelSelect">
+    <select id="channelFilter">
       <option value="">All Channels</option>
-      <option value="Banner">Banner</option>
-      <option value="Native">Native</option>
-      <option value="Social">Social</option>
-      <option value="Push">Push</option>
     </select>
-    <select id="countrySelect">
+    <select id="countryFilter">
       <option value="">All Countries</option>
-      <option value="US">US</option>
-      <option value="UK">UK</option>
-      <option value="AU">AU</option>
-      <option value="CA">CA</option>
     </select>
-    <button onclick="loadOffers()">Search</button>
+    <select id="payoutFilter">
+      <option value="">Any Payout</option>
+      <option value="low">Under $50</option>
+      <option value="mid">$50 - $100</option>
+      <option value="high">Over $100</option>
+    </select>
+    <select id="sortFilter">
+      <option value="">Sort by...</option>
+      <option value="payout-high">Payout: High to Low</option>
+      <option value="payout-low">Payout: Low to High</option>
+      <option value="epc-high">EPC: High to Low</option>
+    </select>
+    <input type="text" id="searchInput" placeholder="Search keyword..." />
   </div>
+
   <div id="offers">Loading offers...</div>
 
   <script>
@@ -90,53 +118,108 @@
     const baseId = 'app12gesbScGlSR9r';
     const tableName = 'Imported table';
 
-    function loadOffers() {
-      const category = document.getElementById('categorySelect').value;
-      const channel = document.getElementById('channelSelect').value;
-      const country = document.getElementById('countrySelect').value;
+    fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=50&filterByFormula={test subset}=1`, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    })
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('offers');
+        const categoryFilter = document.getElementById('categoryFilter');
+        const channelFilter = document.getElementById('channelFilter');
+        const countryFilter = document.getElementById('countryFilter');
+        const payoutFilter = document.getElementById('payoutFilter');
+        const sortFilter = document.getElementById('sortFilter');
+        const searchInput = document.getElementById('searchInput');
 
-      let formulaParts = ['{test subset}=1'];
-      if (category) formulaParts.push(`FIND(\"${category}\", ARRAYJOIN({Category}))`);
-      if (channel) formulaParts.push(`FIND(\"${channel}\", ARRAYJOIN({Channels}))`);
-      if (country) formulaParts.push(`FIND(\"${country}\", ARRAYJOIN({Countries}))`);
-      const filterFormula = `AND(${formulaParts.join(',')})`;
+        let offers = data.records;
 
-      fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=15&filterByFormula=${encodeURIComponent(filterFormula)}`, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-      })
-        .then(res => res.json())
-        .then(data => {
-          const container = document.getElementById('offers');
-          if (!data.records || data.records.length === 0) {
-            container.innerHTML = "<p>No matching offers found.</p>";
-            return;
+        const categories = new Set();
+        const channels = new Set();
+        const countries = new Set();
+
+        offers.forEach(r => {
+          (r.fields.Category || []).forEach(c => categories.add(c));
+          (r.fields.Channels || []).forEach(c => channels.add(c));
+          (r.fields.Countries || []).forEach(c => countries.add(c));
+        });
+
+        categories.forEach(c => categoryFilter.innerHTML += `<option value="${c}">${c}</option>`);
+        channels.forEach(c => channelFilter.innerHTML += `<option value="${c}">${c}</option>`);
+        countries.forEach(c => countryFilter.innerHTML += `<option value="${c}">${c}</option>`);
+
+        function renderOffers() {
+          const cat = categoryFilter.value;
+          const chan = channelFilter.value;
+          const geo = countryFilter.value;
+          const keyword = searchInput.value.toLowerCase();
+          const payout = payoutFilter.value;
+          const sort = sortFilter.value;
+
+          let filtered = offers.filter(r => {
+            const f = r.fields;
+            const matchCategory = !cat || (f.Category || []).includes(cat);
+            const matchChannel = !chan || (f.Channels || []).includes(chan);
+            const matchCountry = !geo || (f.Countries || []).includes(geo);
+            const matchKeyword = !keyword || (f.Name || '').toLowerCase().includes(keyword) || (f.Description || '').toLowerCase().includes(keyword);
+            const payoutValue = parseFloat(f.Payout || 0);
+            const matchPayout =
+              !payout ||
+              (payout === 'low' && payoutValue < 50) ||
+              (payout === 'mid' && payoutValue >= 50 && payoutValue <= 100) ||
+              (payout === 'high' && payoutValue > 100);
+
+            return matchCategory && matchChannel && matchCountry && matchKeyword && matchPayout;
+          });
+
+          if (sort === 'payout-high') {
+            filtered.sort((a, b) => (parseFloat(b.fields.Payout || 0)) - (parseFloat(a.fields.Payout || 0)));
+          } else if (sort === 'payout-low') {
+            filtered.sort((a, b) => (parseFloat(a.fields.Payout || 0)) - (parseFloat(b.fields.Payout || 0)));
+          } else if (sort === 'epc-high') {
+            filtered.sort((a, b) => (parseFloat(b.fields.EPC || 0)) - (parseFloat(a.fields.EPC || 0)));
           }
-          container.innerHTML = data.records.map(record => {
+
+          container.innerHTML = filtered.map(record => {
             const f = record.fields;
+            const tag = f["Brand Bidding Only"] ? `<span class="tags">Brand Bidding ✅</span>` : '';
+            const top = f["Top Performer"] ? `<span class="tags" style="background:#ff5722">🔥 Top Performer</span>` : '';
+            const epc = f.EPC ? `<p><strong>EPC:</strong> $${f.EPC}</p>` : '';
+
             return `
-              <div class="offer">
-                <img src="${f['thumbnail url'] || ''}" alt="Thumbnail">
-                <div class="offer-info">
+              <div class="offer-card">
+                <img src="${f['thumbnail url'] || ''}" alt="${f.Name}" />
+                <div class="offer-content">
                   <h3>${f.Name || 'Unnamed Offer'}</h3>
-                  <p><strong>Highlight:</strong> ${f.Description || 'No description'}</p>
+                  <p class="highlight">🎯 ${f.Description || 'High-converting exclusive offer just for you!'} 🚀</p>
                   <p><strong>Category:</strong> ${f.Category?.join(', ') || 'N/A'}</p>
                   <p><strong>Payout:</strong> $${f.Payout || 'N/A'}</p>
                   <p><strong>GEOs:</strong> ${f.Countries?.join(', ') || 'N/A'}</p>
-                  <a href="${f['Portal Link']}" target="_blank">Apply Now</a>
+                  ${epc}
+                  ${tag} ${top}
+                  <div>
+                    <a class="apply-link" href="${f['Portal Link']}" target="_blank">Apply Now</a>
+                    <button class="copy-btn" onclick="navigator.clipboard.writeText('${f['Portal Link']}')">📋 Copy</button>
+                  </div>
                 </div>
               </div>
             `;
           }).join('');
-        })
-        .catch(err => {
-          document.getElementById('offers').innerHTML = "⚠️ Error loading offers.";
-          console.error(err);
-        });
-    }
+        }
 
-    loadOffers();
+        [categoryFilter, channelFilter, countryFilter, searchInput, payoutFilter, sortFilter].forEach(input => {
+          input.addEventListener('input', renderOffers);
+        });
+
+        renderOffers();
+      })
+      .catch(err => {
+        document.getElementById('offers').innerHTML = "⚠️ Error loading offers.";
+        console.error(err);
+      });
   </script>
 </body>
 </html>
+
+
