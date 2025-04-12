@@ -1,49 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SmartADV Offer Finder</title>
-  <style>
-    body { font-family: Arial; padding: 20px; }
-    .offer { border: 1px solid #ccc; padding: 15px; margin-bottom: 10px; border-radius: 8px; }
-  </style>
-</head>
-<body>
+const apiKey = import.meta.env.VITE_AIRTABLE_API_KEY;
+const baseId = import.meta.env.VITE_AIRTABLE_BASE_ID;
+const tableName = import.meta.env.VITE_AIRTABLE_TABLE_NAME;
 
-  <h1>🔥 SmartADV Live Offers</h1>
-  <div id="offers">Loading offers...</div>
+fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=15&filterByFormula={test subset}=1`, {
+  headers: {
+    Authorization: `Bearer ${apiKey}`,
+  },
+})
+  .then(res => res.json())
+  .then(data => {
+    // Show the offers on the page
+    console.log(data.records);
+    // You’d dynamically render the HTML here
+  });
 
-  <script>
-    const airtableApiKey = "YOUR_API_KEY";  // Replace
-    const baseId = "YOUR_BASE_ID";          // Replace
-    const tableName = "YOUR_TABLE_NAME";    // Replace
-
-    fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=15&view=Grid%20view`, {
-      headers: {
-        Authorization: `Bearer ${airtableApiKey}`
-      }
-    })
-    .then(res => res.json())
-    .then(data => {
-      const container = document.getElementById('offers');
-      container.innerHTML = "";
-      data.records.forEach(record => {
-        const fields = record.fields;
-        container.innerHTML += `
-          <div class="offer">
-            <h3>${fields["Offer Name"] || "No Name"}</h3>
-            <p><strong>Category:</strong> ${fields["Category"] || "-"}</p>
-            <p><strong>Payout:</strong> $${fields["Payout"] || "-"}</p>
-            <p><a href="${fields["Portal Link"] || '#'}" target="_blank">Apply</a></p>
-          </div>
-        `;
-      });
-    })
-    .catch(err => {
-      console.error(err);
-      document.getElementById('offers').innerHTML = "<p>Error loading offers.</p>";
-    });
-  </script>
-</body>
-</html>
