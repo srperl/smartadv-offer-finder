@@ -48,7 +48,8 @@
     }
     .highlight {
       font-style: italic;
-      margin-bottom: 10px;
+      margin: 10px 0;
+      color: #444;
     }
     .offer-content p {
       margin: 5px 0;
@@ -149,6 +150,19 @@
         channels.forEach(c => channelFilter.innerHTML += `<option value="${c}">${c}</option>`);
         countries.forEach(c => countryFilter.innerHTML += `<option value="${c}">${c}</option>`);
 
+        function generateHighlight(f) {
+          const epc = parseFloat(f.EPC || 0);
+          const payout = parseFloat(f.Payout || 0);
+          const terms = f['Terms and Conditions'] || '';
+
+          if (epc > 1.5) return '💸 EPC crushing it! High return for every click!';
+          if (payout > 100) return '💰 Big bounty alert! Over $100 per conversion!';
+          if (terms.includes('no brand bidding')) return '⚠️ Strict compliance, but high reward!';
+          if (f['Top Performer']) return '🔥 A proven top performer. Don’t miss out!';
+
+          return '🎯 Solid offer with strong metrics. Perfect for scaling.';
+        }
+
         function renderOffers() {
           const cat = categoryFilter.value;
           const chan = channelFilter.value;
@@ -186,16 +200,17 @@
             const tag = f["Brand Bidding Only"] ? `<span class="tags">Brand Bidding ✅</span>` : '';
             const top = f["Top Performer"] ? `<span class="tags" style="background:#ff5722">🔥 Top Performer</span>` : '';
             const epc = f.EPC ? `<p><strong>EPC:</strong> $${f.EPC}</p>` : '';
+            const highlightLine = generateHighlight(f);
 
             return `
               <div class="offer-card">
                 <img src="${f['thumbnail url'] || ''}" alt="${f.Name}" />
                 <div class="offer-content">
                   <h3>${f.Name || 'Unnamed Offer'}</h3>
-                  <p class="highlight">🎯 ${f.Description || 'High-converting exclusive offer just for you!'} 🚀</p>
                   <p><strong>Category:</strong> ${f.Category?.join(', ') || 'N/A'}</p>
                   <p><strong>Payout:</strong> $${f.Payout || 'N/A'}</p>
                   <p><strong>GEOs:</strong> ${f.Countries?.join(', ') || 'N/A'}</p>
+                  <p class="highlight">${highlightLine}</p>
                   ${epc}
                   ${tag} ${top}
                   <div>
@@ -221,5 +236,3 @@
   </script>
 </body>
 </html>
-
-
