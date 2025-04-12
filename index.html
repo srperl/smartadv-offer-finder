@@ -3,46 +3,123 @@
 <head>
   <meta charset="UTF-8" />
   <title>SmartADV Offer Finder</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    h1 {
+      font-size: 24px;
+    }
+    select, button {
+      margin-right: 10px;
+      padding: 6px;
+      font-size: 14px;
+    }
+    .offer {
+      padding: 10px;
+      margin: 15px 0;
+      border: 1px solid #ccc;
+    }
+    .loading {
+      font-style: italic;
+    }
+  </style>
 </head>
 <body>
   <h1>SmartADV Offer Finder</h1>
-  <div id="offers">Loading offers...</div>
+
+  <div>
+    <label>Category:
+      <select id="category">
+        <option value="">Any</option>
+        <option value="Health">Health</option>
+        <option value="Diet">Diet</option>
+        <option value="Beauty">Beauty</option>
+        <option value="Ecommerce">Ecommerce</option>
+      </select>
+    </label>
+
+    <label>Channel:
+      <select id="channel">
+        <option value="">Any</option>
+        <option value="Banner">Banner</option>
+        <option value="Native">Native</option>
+        <option value="Social">Social</option>
+        <option value="Push">Push</option>
+        <option value="SEO">SEO</option>
+      </select>
+    </label>
+
+    <label>Country:
+      <select id="country">
+        <option value="">Any</option>
+        <option value="US">US</option>
+        <option value="AU">AU</option>
+        <option value="CA">CA</option>
+        <option value="UK">UK</option>
+        <option value="IE">IE</option>
+      </select>
+    </label>
+
+    <button onclick="loadOffers()">Search</button>
+  </div>
+
+  <div id="offers" class="loading">Loading offers...</div>
 
   <script>
-    // TEMP: Replace these with your actual values
     const apiKey = 'patnPgIMAMI9ZXwum.7860eff03b9c59d78ad536532edb41bd347c6900e8f9724681452fd68757097a';
     const baseId = 'app12gesbScGlSR9r';
     const tableName = 'Imported table';
 
-    fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=15&filterByFormula={test subset}=1`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    })
-      .then(res => res.json())
-      .then(data => {
-        const container = document.getElementById('offers');
-        if (!data.records || data.records.length === 0) {
-          container.innerHTML = "<p>No matching offers found.</p>";
-          return;
-        }
-        container.innerHTML = data.records.map(record => {
-          const f = record.fields;
-          return `
-            <div style="padding:10px; margin-bottom:15px; border:1px solid #ccc;">
-              <h3>${f.Name || 'Unnamed Offer'}</h3>
-              <p><strong>Category:</strong> ${f.Category?.join(', ') || 'N/A'}</p>
-              <p><strong>Payout:</strong> $${f.Payout || 'N/A'}</p>
-              <p><strong>GEOs:</strong> ${f.Countries?.join(', ') || 'N/A'}</p>
-              <p><a href="${f['Portal Link']}" target="_blank">Apply Now</a></p>
-            </div>
-          `;
-        }).join('');
+    function loadOffers() {
+      const category = document.getElementById('category').value;
+      const channel = document.getElementById('channel').value;
+      const country = document.getElementById('country').value;
+
+      let formulaParts = ['{test subset} = 1'];
+
+      if (category) formulaParts.push(`FIND(\"${category}\", ARRAYJOIN({Category}, ','))`);
+      if (channel) formulaParts.push(`FIND(\"${channel}\", ARRAYJOIN({Channels}, ','))`);
+      if (country) formulaParts.push(`FIND(\"${country}\", ARRAYJOIN({Countries}, ','))`);
+
+      const filterFormula = `AND(${formulaParts.join(',')})`;
+
+      document.getElementById('offers').innerHTML = 'Loading offers...';
+
+      fetch(`https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}?maxRecords=15&filterByFormula=${encodeURIComponent(filterFormula)}`, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
       })
-      .catch(err => {
-        document.getElementById('offers').innerHTML = "⚠️ Error loading offers.";
-        console.error(err);
-      });
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById('offers');
+          if (!data.records || data.records.length === 0) {
+            container.innerHTML = "<p>No matching offers found.</p>";
+            return;
+          }
+          container.innerHTML = data.records.map(record => {
+            const f = record.fields;
+            return `
+              <div class="offer">
+                <h3>${f.Name || 'Unnamed Offer'}</h3>
+                <p><strong>Category:</strong> ${f.Category?.join(', ') || 'N/A'}</p>
+                <p><strong>Payout:</strong> $${f.Payout || 'N/A'}</p>
+                <p><strong>GEOs:</strong> ${f.Countries?.join(', ') || 'N/A'}</p>
+                <p><a href="${f['Portal Link']}" target="_blank">Apply Now</a></p>
+              </div>
+            `;
+          }).join('');
+        })
+        .catch(err => {
+          document.getElementById('offers').innerHTML = "⚠️ Error loading offers.";
+          console.error(err);
+        });
+    }
+
+    window.onload = loadOffers;
   </script>
 </body>
 </html>
+
