@@ -1,16 +1,46 @@
-const apiKey = import.meta.env.VITE_AIRTABLE_API_KEY;
-const baseId = import.meta.env.VITE_AIRTABLE_BASE_ID;
-const tableName = import.meta.env.VITE_AIRTABLE_TABLE_NAME;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartADV Offer Finder</title>
+</head>
+<body>
+  <h1>SmartADV Offer Finder</h1>
+  <div id="offers">Loading offers...</div>
 
-fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=15&filterByFormula={test subset}=1`, {
-  headers: {
-    Authorization: `Bearer ${apiKey}`,
-  },
-})
-  .then(res => res.json())
-  .then(data => {
-    // Show the offers on the page
-    console.log(data.records);
-    // You’d dynamically render the HTML here
-  });
+  <script type="module">
+    const apiKey = import.meta.env.VITE_AIRTABLE_API_KEY;
+    const baseId = import.meta.env.VITE_AIRTABLE_BASE_ID;
+    const tableName = import.meta.env.VITE_AIRTABLE_TABLE_NAME;
+
+    fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=15&filterByFormula={test subset}=1`, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    })
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('offers');
+        container.innerHTML = data.records.map(record => {
+          const fields = record.fields;
+          return `
+            <div style="margin-bottom: 1em;">
+              <strong>${fields.Name}</strong><br />
+              Category: ${fields.Category?.join(', ') || 'N/A'}<br />
+              Payout: $${fields.Payout || 'N/A'}<br />
+              GEOs: ${fields.Countries?.join(', ') || 'N/A'}<br />
+              <a href="${fields['Portal Link']}" target="_blank">Apply Now</a>
+            </div>
+          `;
+        }).join('');
+      })
+      .catch(err => {
+        document.getElementById('offers').innerHTML = "⚠️ Error loading offers.";
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
+
 
