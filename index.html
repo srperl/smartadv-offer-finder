@@ -74,6 +74,11 @@
       color: #15803d;
       font-weight: bold;
     }
+    .score-label {
+      margin: 2px 0 6px;
+      font-weight: bold;
+      font-size: 13px;
+    }
     .apply-link {
       display: inline-block;
       margin-top: 4px;
@@ -134,7 +139,7 @@
   <div class="pagination" id="pagination"></div>
 
   <script>
-    const apiKey = 'patnPgIMAMI9ZXwum.7860eff03b9c59d78ad536532edb41bd347c6900e8f9724681452fd68757097a';
+    const apiKey = 'YOUR_AIRTABLE_KEY_HERE'; // Replace or proxy via Vercel edge function
     const baseId = 'app12gesbScGlSR9r';
     const tableName = 'Imported table';
     const perPage = 12;
@@ -179,6 +184,11 @@
       return highlights[index % highlights.length];
     }
 
+    function matchMulti(data = [], selected = []) {
+      if (selected.length === 0) return true;
+      return data?.some(val => selected.includes(val));
+    }
+
     function applyFilters(data) {
       return data.filter(r => {
         const f = r.fields;
@@ -196,13 +206,12 @@
       });
     }
 
-    function matchMulti(data = [], selected = []) {
-      if (selected.length === 0) return true;
-      return data?.some(val => selected.includes(val));
-    }
-
     function sortOffers(data) {
       const sort = filters.sort.value;
+      data.forEach(record => {
+        record.score = getAIScore(record);
+      });
+      data.sort((a, b) => b.score - a.score); // AI relevance sorting
       if (sort === 'payout-high') return data.sort((a, b) => b.fields.Payout - a.fields.Payout);
       if (sort === 'payout-low') return data.sort((a, b) => a.fields.Payout - b.fields.Payout);
       if (sort === 'epc-high') return data.sort((a, b) => b.fields.EPC - a.fields.EPC);
@@ -218,6 +227,8 @@
         const img = f['thumbnail url'] || 'https://via.placeholder.com/300x150?text=SmartADV';
         const name = (f.Name || '').replace(/\(.*?\)/g, '').trim();
         const highlight = generateHighlight(f, i + start);
+        const score = getAIScore(r);
+        const scoreLabel = score === 3 ? "💯 Perfect Match!" : score === 2 ? "✅ Strong Match" : score === 1 ? "🟡 Weak Match" : "❌ No Match";
         const brandBidding = f['Brand Bidding Only'] ? '✅ Brand Bidding' : '🚫 No Brand Bidding';
 
         return `
@@ -229,6 +240,7 @@
               <p><strong>GEOs:</strong> ${f.Countries?.join(', ') || 'N/A'}</p>
               <p><strong>Channels:</strong> ${f.Channels?.join(', ') || 'N/A'} — ${brandBidding}</p>
               <p class="highlight">${highlight}</p>
+              <p class="score-label">${scoreLabel}</p>
               <a class="apply-link" href="${f['Portal Link']}" target="_blank">Apply Now</a>
             </div>
           </div>
@@ -252,6 +264,15 @@
       }
     }
 
+    function getAIScore(offer) {
+      const prefs = window.affiliatePreferences || {};
+      let score = 0;
+      if ((prefs.categories || []).some(cat => (offer.fields.Category || []).includes(cat))) score++;
+      if ((prefs.channels || []).some(chan => (offer.fields.Channels || []).includes(chan))) score++;
+      if ((prefs.countries || []).some(cty => (offer.fields.Countries || []).includes(cty))) score++;
+      return score;
+    }
+
     function update() {
       const filtered = applyFilters(offers);
       const sorted = sortOffers(filtered);
@@ -269,11 +290,27 @@
     document.getElementById('aiSuggestBtn').addEventListener('click', () => {
       const urlParams = new URLSearchParams(window.location.search);
       const id = urlParams.get('affiliateId') || 'unknown';
-      alert(`🤖 Smart match using affiliate ID: ${id}. Based on your preferences, these are 🔥 right now! (Future: real-time profile data here)`);
+      alert(`🤖 Smart match using affiliate ID: ${id}. Based on your preferences, these are 🔥 right now!`);
     });
 
-    fetchData().then(data => {
-      offers = data;
+    const affiliateId = new URLSearchParams(window.location.search).get('affiliateId') || 'unknown';
+    fetch(`/api/get-affiliate-data?affiliateId=${affiliateId}`)
+      .then(res => res.json())
+      .then(data => {
+        window.affiliatePreferences = {
+          categories: data.categories || [],
+          countries: data.countries || [],
+          channels: data.channels || []
+        };
+        update();
+      })
+      .catch(err => {
+        console.error('Error loading affiliate preferences', err);
+        update(); // fallback
+      });
+
+    fetchData().then(records => {
+      offers = records;
 
       const sets = { category: new Set(), channel: new Set(), country: new Set() };
       offers.forEach(r => {
@@ -295,79 +332,5 @@
       update();
     });
   </script>
-<script>
-const HUBSPOT_API_KEY = 'YOUR_HUBSPOT_PRIVATE_APP_TOKEN';
-const AFFILIATE_ID_PROPERTY = 'affiliate_id';
-const knownAffiliateId = '123456'; // REPLACE this with dynamic affiliateId logic (e.g., from session or URL)
-
-async function fetchAffiliatePreferences(affiliateId) {
-  const response = await fetch(`https://api.hubapi.com/crm/v3/objects/contacts?properties=affiliate_preferred_category,affiliate_preferred_country,affiliate_preferred_channel&limit=1&archived=false&hapikey=${HUBSPOT_API_KEY}&filter=${AFFILIATE_ID_PROPERTY}=${affiliateId}`, {
-    headers: {
-      'Authorization': `Bearer ${HUBSPOT_API_KEY}`,
-      'Content-Type': 'application/json'
-    }
-  });
-
-  const data = await response.json();
-  const contact = data.results?.[0]?.properties;
-
-  return {
-    categories: contact?.aff_preferred_verticals?.split(',') || [],
-    countries: contact?.aff_preferred_countries?.split(',') || [],
-    channels: contact?.traffic_sources?.split(',') || []
-  };
-}
-
-// 🧠 Insert BEFORE offer data is fetched
-fetchAffiliatePreferences(knownAffiliateId).then(prefs => {
-  // Pre-select filter dropdowns
-  document.querySelectorAll('#categoryFilter option').forEach(opt => {
-    if (prefs.categories.includes(opt.value)) opt.selected = true;
-  });
-  document.querySelectorAll('#countryFilter option').forEach(opt => {
-    if (prefs.countries.includes(opt.value)) opt.selected = true;
-  });
-  document.querySelectorAll('#channelFilter option').forEach(opt => {
-    if (prefs.channels.includes(opt.value)) opt.selected = true;
-  });
-
-  // Then fetch and show the offers
-const affiliateId = new URLSearchParams(window.location.search).get('affiliateId') || 'unknown';
-
-fetch(`/api/get-affiliate-data?affiliateId=${affiliateId}`)
-  .then(res => res.json())
-  .then(data => {
-    console.log('🎯 AI Matched Preferences:', data);
-
-    // Store preferences globally to use later in offer scoring
-    window.affiliatePreferences = {
-      categories: data.categories || [],
-      countries: data.countries || [],
-      channels: data.channels || []
-    };
-
-    // You could also trigger logic to use these for filtering here
-  })
-  .catch(err => console.error('Error loading affiliate preferences', err));
-
-  fetchData().then(records => {
-    offers = records;
-    renderOffers(offers);
-    setupPagination(offers.length, () => renderOffers(offers));
-  });
-}).catch(err => {
-  console.error('Failed to fetch affiliate preferences:', err);
-  // fallback in case no match
-  fetchData().then(records => {
-    offers = records;
-    renderOffers(offers);
-    setupPagination(offers.length, () => renderOffers(offers));
-  });
-});
-</script>
 </body>
 </html>
-
-</body>
-</html>
-
