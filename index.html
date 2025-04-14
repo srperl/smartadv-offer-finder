@@ -80,6 +80,30 @@
       font-weight: 600;
       font-size: 13px;
     }
+    .pagination {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .pagination button {
+      background-color: #0070f3;
+      color: white;
+      font-weight: bold;
+      border: none;
+      margin: 0 4px;
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .pagination button[disabled] {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    #no-results {
+      text-align: center;
+      font-weight: bold;
+      color: #999;
+      margin-top: 40px;
+    }
   </style>
 </head>
 <body>
@@ -91,19 +115,28 @@
     <input type="text" id="searchInput" placeholder="Search keyword..." />
     <button id="aiSuggestBtn">🔍 AI Matched Offers</button>
   </div>
+
   <div id="offers" class="offer-grid">Loading offers...</div>
+  <div id="no-results" style="display:none;">No offers match your selection. Try changing filters.</div>
+  <div class="pagination" id="pagination"></div>
 
   <script>
     const apiKey = 'patnPgIMAMI9ZXwum.7860eff03b9c59d78ad536532edb41bd347c6900e8f9724681452fd68757097a';
     const baseId = 'app12gesbScGlSR9r';
     const tableName = 'Imported table';
-    let offers = [];
+    let offers = [], currentPage = 1, perPage = 8;
 
     const filters = {
       category: document.getElementById('categoryFilter'),
       channel: document.getElementById('channelFilter'),
       country: document.getElementById('countryFilter'),
       search: document.getElementById('searchInput')
+    };
+
+    window.affiliatePreferences = {
+      categories: ['Health', 'CBD'],
+      channels: ['Push', 'Email'],
+      countries: ['US', 'CA']
     };
 
     function getAIScore(offer) {
@@ -117,7 +150,18 @@
 
     function renderOffers(data) {
       const container = document.getElementById('offers');
-      container.innerHTML = data.map((r, i) => {
+      const noResults = document.getElementById('no-results');
+      const paginated = data.slice((currentPage - 1) * perPage, currentPage * perPage);
+
+      if (paginated.length === 0) {
+        container.innerHTML = '';
+        noResults.style.display = 'block';
+        return;
+      }
+
+      noResults.style.display = 'none';
+
+      container.innerHTML = paginated.map((r, i) => {
         const f = r.fields;
         const img = f['thumbnail url'] || 'https://via.placeholder.com/300x150?text=SmartADV';
         const name = f.Name || 'Untitled Offer';
@@ -156,8 +200,26 @@
       });
     }
 
+    function setupPagination(total) {
+      const container = document.getElementById('pagination');
+      container.innerHTML = '';
+      const pages = Math.ceil(total / perPage);
+
+      for (let i = 1; i <= pages; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        btn.disabled = i === currentPage;
+        btn.onclick = () => {
+          currentPage = i;
+          updateOffers();
+        };
+        container.appendChild(btn);
+      }
+    }
+
     function updateOffers() {
       const filtered = applyFilters(offers);
+      setupPagination(filtered.length);
       renderOffers(filtered);
     }
 
@@ -198,24 +260,25 @@
     }
 
     document.querySelectorAll('select, input').forEach(el => {
-      el.addEventListener('change', updateOffers);
-      el.addEventListener('input', updateOffers);
+      el.addEventListener('change', () => {
+        currentPage = 1;
+        updateOffers();
+      });
+      el.addEventListener('input', () => {
+        currentPage = 1;
+        updateOffers();
+      });
     });
 
     document.getElementById('aiSuggestBtn').addEventListener('click', () => {
       alert('🤖 AI is analyzing your preferences...');
     });
 
-    window.affiliatePreferences = {
-      categories: ['Health', 'CBD'],
-      channels: ['Push', 'Email'],
-      countries: ['US', 'CA']
-    };
-
     fetchData();
   </script>
 </body>
 </html>
+
 
 
 
