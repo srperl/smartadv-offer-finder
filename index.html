@@ -256,30 +256,49 @@
       return json.records;
     }
 
-    fetchData().then(data => {
-      offers = data;
+fetchData().then(data => {
+  offers = data;
 
-      // Setup filter options
-      const sets = { category: new Set(), channel: new Set(), country: new Set() };
-      offers.forEach(r => {
-        (r.fields.Category || []).forEach(val => sets.category.add(val));
-        (r.fields.Channels || []).forEach(val => sets.channel.add(val));
-        (r.fields.Countries || []).forEach(val => sets.country.add(val));
-      });
+  const sets = { category: new Set(), channel: new Set(), country: new Set() };
+  offers.forEach(r => {
+    (r.fields.Category || []).forEach(val => sets.category.add(val));
+    (r.fields.Channels || []).forEach(val => sets.channel.add(val));
+    (r.fields.Countries || []).forEach(val => sets.country.add(val));
+  });
 
-      for (const [key, set] of Object.entries(sets)) {
-        const el = filters[key];
-        [...set].sort().forEach(val => {
-          const opt = document.createElement('option');
-          opt.value = val;
-          opt.textContent = val;
-          el.appendChild(opt);
-        });
-      }
-
-      // Run full display
-      update();
+  for (const [type, set] of Object.entries(sets)) {
+    const el = filters[type];
+    [...set].sort().forEach(val => {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = val;
+      el.appendChild(opt);
     });
+  }
+
+  // ✅ Render offers immediately (no scoring)
+  renderOffers(offers);
+  setupPagination(offers.length, update);
+
+  // ✅ Then fetch preferences & re-rank
+  const affiliateId = new URLSearchParams(window.location.search).get('affiliateId') || 'unknown';
+  fetch(`/api/get-affiliate-data?affiliateId=${affiliateId}`)
+    .then(res => res.json())
+    .then(data => {
+      window.affiliatePreferences = {
+        categories: data.categories || [],
+        countries: data.countries || [],
+        channels: data.channels || []
+      };
+
+      // ✅ Re-run full sort & display once AI prefs arrive
+      update();
+    })
+    .catch(err => {
+      console.warn('⚠️ Could not load affiliate preferences:', err);
+    });
+});
+
   </script>
 </body>
 </html>
