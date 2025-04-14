@@ -63,22 +63,13 @@
       border-radius: 6px;
       margin-bottom: 6px;
     }
-    .offer-content h3 {
-      margin: 0;
-      color: #00a4e4;
-      font-size: 1rem;
-    }
-    .highlight {
+    .highlight, .score-label {
       font-style: italic;
       margin: 4px 0;
-      color: #15803d;
       font-weight: bold;
     }
-    .score-label {
-      margin: 2px 0 6px;
-      font-weight: bold;
-      font-size: 13px;
-    }
+    .highlight { color: #15803d; }
+    .score-label { color: #0066cc; }
     .apply-link {
       display: inline-block;
       margin-top: 4px;
@@ -108,10 +99,6 @@
       background-color: #cccccc;
       cursor: not-allowed;
     }
-    .channels, .offer-id {
-      font-size: 13px;
-      margin-bottom: 2px;
-    }
   </style>
 </head>
 <body>
@@ -135,16 +122,15 @@
     <input type="text" id="searchInput" placeholder="Search keyword..." />
     <button id="aiSuggestBtn">🔍 AI Matched Offers</button>
   </div>
-  <div id="offers" class="offer-grid">Please wait while we load the offers...</div>
+  <div id="offers" class="offer-grid"><p>⏳ Loading your best offers…</p></div>
   <div class="pagination" id="pagination"></div>
 
   <script>
-    const apiKey = 'YOUR_AIRTABLE_KEY_HERE'; // Replace or proxy via Vercel edge function
+    const apiKey = 'patnPgIMAMI9ZXwum.7860eff03b9c59d78ad536532edb41bd347c6900e8f9724681452fd68757097a';
     const baseId = 'app12gesbScGlSR9r';
     const tableName = 'Imported table';
     const perPage = 12;
     let offers = [], currentPage = 1;
-
     const filters = {
       category: document.getElementById('categoryFilter'),
       channel: document.getElementById('channelFilter'),
@@ -154,18 +140,18 @@
       search: document.getElementById('searchInput')
     };
 
-    async function fetchData() {
-      const allRecords = [];
-      let offset = '';
-      do {
-        const res = await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?pageSize=100&filterByFormula={test subset}=1${offset ? `&offset=${offset}` : ''}`, {
-          headers: { Authorization: `Bearer ${apiKey}` }
-        });
-        const json = await res.json();
-        allRecords.push(...json.records);
-        offset = json.offset;
-      } while (offset);
-      return allRecords;
+    function getAIScore(offer) {
+      const prefs = window.affiliatePreferences || {};
+      let score = 0;
+      if ((prefs.categories || []).some(cat => (offer.fields.Category || []).includes(cat))) score++;
+      if ((prefs.channels || []).some(chan => (offer.fields.Channels || []).includes(chan))) score++;
+      if ((prefs.countries || []).some(cty => (offer.fields.Countries || []).includes(cty))) score++;
+      return score;
+    }
+
+    function matchMulti(data = [], selected = []) {
+      if (selected.length === 0) return true;
+      return data?.some(val => selected.includes(val));
     }
 
     function generateHighlight(f, index) {
@@ -184,38 +170,31 @@
       return highlights[index % highlights.length];
     }
 
-    function matchMulti(data = [], selected = []) {
-      if (selected.length === 0) return true;
-      return data?.some(val => selected.includes(val));
-    }
-
     function applyFilters(data) {
       return data.filter(r => {
         const f = r.fields;
-        const catMatch = matchMulti(f.Category, [...filters.category.selectedOptions].map(o => o.value));
-        const chanMatch = matchMulti(f.Channels, [...filters.channel.selectedOptions].map(o => o.value));
-        const geoMatch = matchMulti(f.Countries, [...filters.country.selectedOptions].map(o => o.value));
-        const keyword = filters.search.value.toLowerCase();
-        const kwMatch = !keyword || f.Name?.toLowerCase().includes(keyword) || f.Description?.toLowerCase().includes(keyword);
-        const payoutValue = parseFloat(f.Payout || 0);
-        const payoutMatch = !filters.payout.value ||
-          (filters.payout.value === 'low' && payoutValue < 50) ||
-          (filters.payout.value === 'mid' && payoutValue >= 50 && payoutValue <= 100) ||
-          (filters.payout.value === 'high' && payoutValue > 100);
-        return catMatch && chanMatch && geoMatch && kwMatch && payoutMatch;
+        return matchMulti(f.Category, getValues(filters.category)) &&
+               matchMulti(f.Channels, getValues(filters.channel)) &&
+               matchMulti(f.Countries, getValues(filters.country)) &&
+               (!filters.search.value || f.Name?.toLowerCase().includes(filters.search.value.toLowerCase())) &&
+               (!filters.payout.value || (
+                 (filters.payout.value === 'low' && f.Payout < 50) ||
+                 (filters.payout.value === 'mid' && f.Payout >= 50 && f.Payout <= 100) ||
+                 (filters.payout.value === 'high' && f.Payout > 100)
+               ));
       });
+    }
+
+    function getValues(selectEl) {
+      return [...selectEl.selectedOptions].map(o => o.value);
     }
 
     function sortOffers(data) {
       const sort = filters.sort.value;
-      data.forEach(record => {
-        record.score = getAIScore(record);
-      });
-      data.sort((a, b) => b.score - a.score); // AI relevance sorting
       if (sort === 'payout-high') return data.sort((a, b) => b.fields.Payout - a.fields.Payout);
       if (sort === 'payout-low') return data.sort((a, b) => a.fields.Payout - b.fields.Payout);
       if (sort === 'epc-high') return data.sort((a, b) => b.fields.EPC - a.fields.EPC);
-      return data;
+      return data.sort((a, b) => getAIScore(b) - getAIScore(a));
     }
 
     function renderOffers(data) {
@@ -224,53 +203,37 @@
       const paginated = data.slice(start, start + perPage);
       container.innerHTML = paginated.map((r, i) => {
         const f = r.fields;
-        const img = f['thumbnail url'] || 'https://via.placeholder.com/300x150?text=SmartADV';
-        const name = (f.Name || '').replace(/\(.*?\)/g, '').trim();
-        const highlight = generateHighlight(f, i + start);
         const score = getAIScore(r);
         const scoreLabel = score === 3 ? "💯 Perfect Match!" : score === 2 ? "✅ Strong Match" : score === 1 ? "🟡 Weak Match" : "❌ No Match";
+        const img = f['thumbnail url'] || 'https://via.placeholder.com/300x150?text=SmartADV';
         const brandBidding = f['Brand Bidding Only'] ? '✅ Brand Bidding' : '🚫 No Brand Bidding';
-
         return `
           <div class="offer-card" data-category="${f.Category?.join(', ') || ''}">
-            <img src="${img}" alt="${name}" />
+            <img src="${img}" alt="${f.Name}" />
             <div class="offer-content">
-              <div class="offer-id">#${f['Offer ID'] || ''} - ${name}</div>
-              <p><strong>Payout:</strong> $${f.Payout || 'N/A'}</p>
+              <div class="offer-id">#${f['Offer ID']} - ${f.Name?.replace(/\(.*?\)/g, '').trim()}</div>
+              <p><strong>Payout:</strong> $${f.Payout}</p>
               <p><strong>GEOs:</strong> ${f.Countries?.join(', ') || 'N/A'}</p>
               <p><strong>Channels:</strong> ${f.Channels?.join(', ') || 'N/A'} — ${brandBidding}</p>
-              <p class="highlight">${highlight}</p>
+              <p class="highlight">${generateHighlight(f, i)}</p>
               <p class="score-label">${scoreLabel}</p>
               <a class="apply-link" href="${f['Portal Link']}" target="_blank">Apply Now</a>
             </div>
-          </div>
-        `;
+          </div>`;
       }).join('');
     }
 
     function setupPagination(total, onPageChange) {
-      const pages = Math.ceil(total / perPage);
       const container = document.getElementById('pagination');
+      const pages = Math.ceil(total / perPage);
       container.innerHTML = '';
       for (let i = 1; i <= pages; i++) {
         const btn = document.createElement('button');
         btn.textContent = i;
         btn.disabled = i === currentPage;
-        btn.onclick = () => {
-          currentPage = i;
-          onPageChange();
-        };
+        btn.onclick = () => { currentPage = i; onPageChange(); };
         container.appendChild(btn);
       }
-    }
-
-    function getAIScore(offer) {
-      const prefs = window.affiliatePreferences || {};
-      let score = 0;
-      if ((prefs.categories || []).some(cat => (offer.fields.Category || []).includes(cat))) score++;
-      if ((prefs.channels || []).some(chan => (offer.fields.Channels || []).includes(chan))) score++;
-      if ((prefs.countries || []).some(cty => (offer.fields.Countries || []).includes(cty))) score++;
-      return score;
     }
 
     function update() {
@@ -280,38 +243,23 @@
       setupPagination(sorted.length, update);
     }
 
-    filters.category.addEventListener('change', update);
-    filters.channel.addEventListener('change', update);
-    filters.country.addEventListener('change', update);
-    filters.search.addEventListener('input', update);
-    filters.payout.addEventListener('change', update);
-    filters.sort.addEventListener('change', update);
-
     document.getElementById('aiSuggestBtn').addEventListener('click', () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const id = urlParams.get('affiliateId') || 'unknown';
-      alert(`🤖 Smart match using affiliate ID: ${id}. Based on your preferences, these are 🔥 right now!`);
+      alert("🤖 AI matching applied using affiliate preferences!");
+      update();
     });
 
-    const affiliateId = new URLSearchParams(window.location.search).get('affiliateId') || 'unknown';
-    fetch(`/api/get-affiliate-data?affiliateId=${affiliateId}`)
-      .then(res => res.json())
-      .then(data => {
-        window.affiliatePreferences = {
-          categories: data.categories || [],
-          countries: data.countries || [],
-          channels: data.channels || []
-        };
-        update();
-      })
-      .catch(err => {
-        console.error('Error loading affiliate preferences', err);
-        update(); // fallback
+    async function fetchData() {
+      const res = await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?pageSize=100`, {
+        headers: { Authorization: `Bearer ${apiKey}` }
       });
+      const json = await res.json();
+      return json.records;
+    }
 
-    fetchData().then(records => {
-      offers = records;
+    fetchData().then(data => {
+      offers = data;
 
+      // Setup filter options
       const sets = { category: new Set(), channel: new Set(), country: new Set() };
       offers.forEach(r => {
         (r.fields.Category || []).forEach(val => sets.category.add(val));
@@ -319,8 +267,8 @@
         (r.fields.Countries || []).forEach(val => sets.country.add(val));
       });
 
-      for (const [type, set] of Object.entries(sets)) {
-        const el = filters[type];
+      for (const [key, set] of Object.entries(sets)) {
+        const el = filters[key];
         [...set].sort().forEach(val => {
           const opt = document.createElement('option');
           opt.value = val;
@@ -329,8 +277,10 @@
         });
       }
 
+      // Run full display
       update();
     });
   </script>
 </body>
 </html>
+
