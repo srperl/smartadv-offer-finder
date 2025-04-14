@@ -24,9 +24,9 @@ export default async function handler(req, res) {
           }]
         }],
         properties: [
-          "affiliate_preferred_country",
-          "affiliate_preferred_category",
-          "affiliate_preferred_channel"
+          "aff_preferred_countries",
+          "aff_preferred_verticals",
+          "traffic_sources"
         ],
         limit: 1
       })
