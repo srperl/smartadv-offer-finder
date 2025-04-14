@@ -51,11 +51,6 @@
       font-size: 13px;
       background-color: #f4f9fb;
     }
-    .offer-card[data-category*="Diet"] { background-color: #fff4e6; }
-    .offer-card[data-category*="Health"] { background-color: #e6f9f1; }
-    .offer-card[data-category*="Beauty"] { background-color: #fce6f3; }
-    .offer-card[data-category*="Ecomm"] { background-color: #e6f0ff; }
-
     .offer-card img {
       width: 100%;
       max-height: 100px;
@@ -63,41 +58,27 @@
       border-radius: 6px;
       margin-bottom: 6px;
     }
-    .highlight, .score-label {
+    .highlight {
       font-style: italic;
       margin: 4px 0;
+      color: #15803d;
       font-weight: bold;
     }
-    .highlight { color: #15803d; }
-    .score-label { color: #0066cc; }
+    .score-label {
+      font-weight: bold;
+      color: #00a4e4;
+      margin-top: 4px;
+    }
     .apply-link {
       display: inline-block;
-      margin-top: 4px;
+      margin-top: 6px;
       color: #fff;
       background-color: #f26522;
-      padding: 4px 8px;
+      padding: 6px 10px;
       border-radius: 4px;
       text-decoration: none;
       font-weight: 600;
       font-size: 13px;
-    }
-    .pagination {
-      text-align: center;
-      margin-top: 20px;
-    }
-    .pagination button {
-      background-color: #00a4e4;
-      border: none;
-      color: white;
-      padding: 6px 10px;
-      margin: 0 3px;
-      border-radius: 4px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .pagination button[disabled] {
-      background-color: #cccccc;
-      cursor: not-allowed;
     }
   </style>
 </head>
@@ -107,199 +88,133 @@
     <select id="categoryFilter" multiple size="4"></select>
     <select id="channelFilter" multiple size="4"></select>
     <select id="countryFilter" multiple size="4"></select>
-    <select id="payoutFilter">
-      <option value="">Any Payout</option>
-      <option value="low">Under $50</option>
-      <option value="mid">$50 - $100</option>
-      <option value="high">Over $100</option>
-    </select>
-    <select id="sortFilter">
-      <option value="">Sort by...</option>
-      <option value="payout-high">Payout: High to Low</option>
-      <option value="payout-low">Payout: Low to High</option>
-      <option value="epc-high">EPC: High to Low</option>
-    </select>
     <input type="text" id="searchInput" placeholder="Search keyword..." />
     <button id="aiSuggestBtn">🔍 AI Matched Offers</button>
   </div>
-  <div id="offers" class="offer-grid"><p>⏳ Loading your best offers…</p></div>
-  <div class="pagination" id="pagination"></div>
+  <div id="offers" class="offer-grid">Loading offers...</div>
 
   <script>
     const apiKey = 'patnPgIMAMI9ZXwum.7860eff03b9c59d78ad536532edb41bd347c6900e8f9724681452fd68757097a';
     const baseId = 'app12gesbScGlSR9r';
     const tableName = 'Imported table';
-    const perPage = 12;
-    let offers = [], currentPage = 1;
+    let offers = [];
+
     const filters = {
       category: document.getElementById('categoryFilter'),
       channel: document.getElementById('channelFilter'),
       country: document.getElementById('countryFilter'),
-      payout: document.getElementById('payoutFilter'),
-      sort: document.getElementById('sortFilter'),
       search: document.getElementById('searchInput')
     };
 
     function getAIScore(offer) {
       const prefs = window.affiliatePreferences || {};
       let score = 0;
-      if ((prefs.categories || []).some(cat => (offer.fields.Category || []).includes(cat))) score++;
-      if ((prefs.channels || []).some(chan => (offer.fields.Channels || []).includes(chan))) score++;
-      if ((prefs.countries || []).some(cty => (offer.fields.Countries || []).includes(cty))) score++;
+      if ((prefs.categories || []).some(c => (offer.fields.Category || []).includes(c))) score++;
+      if ((prefs.channels || []).some(c => (offer.fields.Channels || []).includes(c))) score++;
+      if ((prefs.countries || []).some(c => (offer.fields.Countries || []).includes(c))) score++;
       return score;
-    }
-
-    function matchMulti(data = [], selected = []) {
-      if (selected.length === 0) return true;
-      return data?.some(val => selected.includes(val));
-    }
-
-    function generateHighlight(f, index) {
-      const highlights = [
-        '🔥 Hot offer affiliates love!',
-        '💸 Fat EPCs, zero fluff.',
-        '🚀 Trending & converting fast!',
-        '🎯 Target locked: high ROI.',
-        '🤑 Consistent top performer!',
-        '🌎 Geo-friendly money maker.',
-        '💥 Massive click-through surge!',
-        '🔒 Top payout & great control.',
-        '📊 Built for scale. Let’s go!',
-        '🚨 Don’t miss this sleeper hit!'
-      ];
-      return highlights[index % highlights.length];
-    }
-
-    function applyFilters(data) {
-      return data.filter(r => {
-        const f = r.fields;
-        return matchMulti(f.Category, getValues(filters.category)) &&
-               matchMulti(f.Channels, getValues(filters.channel)) &&
-               matchMulti(f.Countries, getValues(filters.country)) &&
-               (!filters.search.value || f.Name?.toLowerCase().includes(filters.search.value.toLowerCase())) &&
-               (!filters.payout.value || (
-                 (filters.payout.value === 'low' && f.Payout < 50) ||
-                 (filters.payout.value === 'mid' && f.Payout >= 50 && f.Payout <= 100) ||
-                 (filters.payout.value === 'high' && f.Payout > 100)
-               ));
-      });
-    }
-
-    function getValues(selectEl) {
-      return [...selectEl.selectedOptions].map(o => o.value);
-    }
-
-    function sortOffers(data) {
-      const sort = filters.sort.value;
-      if (sort === 'payout-high') return data.sort((a, b) => b.fields.Payout - a.fields.Payout);
-      if (sort === 'payout-low') return data.sort((a, b) => a.fields.Payout - b.fields.Payout);
-      if (sort === 'epc-high') return data.sort((a, b) => b.fields.EPC - a.fields.EPC);
-      return data.sort((a, b) => getAIScore(b) - getAIScore(a));
     }
 
     function renderOffers(data) {
       const container = document.getElementById('offers');
-      const start = (currentPage - 1) * perPage;
-      const paginated = data.slice(start, start + perPage);
-      container.innerHTML = paginated.map((r, i) => {
+      container.innerHTML = data.map((r, i) => {
         const f = r.fields;
-        const score = getAIScore(r);
-        const scoreLabel = score === 3 ? "💯 Perfect Match!" : score === 2 ? "✅ Strong Match" : score === 1 ? "🟡 Weak Match" : "❌ No Match";
         const img = f['thumbnail url'] || 'https://via.placeholder.com/300x150?text=SmartADV';
-        const brandBidding = f['Brand Bidding Only'] ? '✅ Brand Bidding' : '🚫 No Brand Bidding';
+        const name = f.Name || 'Untitled Offer';
+        const highlight = ['🔥 Hot offer!', '🚀 Trending pick!', '💰 High EPC!'][i % 3];
+        const score = getAIScore(r);
+        const scoreLabel = score >= 2 ? `<p class="score-label">✨ AI Matched Offer</p>` : '';
+
         return `
-          <div class="offer-card" data-category="${f.Category?.join(', ') || ''}">
-            <img src="${img}" alt="${f.Name}" />
-            <div class="offer-content">
-              <div class="offer-id">#${f['Offer ID']} - ${f.Name?.replace(/\(.*?\)/g, '').trim()}</div>
-              <p><strong>Payout:</strong> $${f.Payout}</p>
-              <p><strong>GEOs:</strong> ${f.Countries?.join(', ') || 'N/A'}</p>
-              <p><strong>Channels:</strong> ${f.Channels?.join(', ') || 'N/A'} — ${brandBidding}</p>
-              <p class="highlight">${generateHighlight(f, i)}</p>
-              <p class="score-label">${scoreLabel}</p>
-              <a class="apply-link" href="${f['Portal Link']}" target="_blank">Apply Now</a>
-            </div>
-          </div>`;
+          <div class="offer-card">
+            <img src="${img}" alt="${name}" />
+            <div><strong>#${f['Offer ID'] || 'N/A'}</strong> - ${name}</div>
+            <p><strong>Category:</strong> ${(f.Category || []).join(', ')}</p>
+            <p><strong>GEOs:</strong> ${(f.Countries || []).join(', ')}</p>
+            <p><strong>Channels:</strong> ${(f.Channels || []).join(', ')}</p>
+            <p class="highlight">${highlight}</p>
+            ${scoreLabel}
+            <a class="apply-link" href="${f['Portal Link']}" target="_blank">Apply Now</a>
+          </div>
+        `;
       }).join('');
     }
 
-    function setupPagination(total, onPageChange) {
-      const container = document.getElementById('pagination');
-      const pages = Math.ceil(total / perPage);
-      container.innerHTML = '';
-      for (let i = 1; i <= pages; i++) {
-        const btn = document.createElement('button');
-        btn.textContent = i;
-        btn.disabled = i === currentPage;
-        btn.onclick = () => { currentPage = i; onPageChange(); };
-        container.appendChild(btn);
-      }
+    function applyFilters(data) {
+      const cats = [...filters.category.selectedOptions].map(o => o.value);
+      const chans = [...filters.channel.selectedOptions].map(o => o.value);
+      const geos = [...filters.country.selectedOptions].map(o => o.value);
+      const kw = filters.search.value.toLowerCase();
+
+      return data.filter(r => {
+        const f = r.fields;
+        const kwMatch = !kw || (f.Name || '').toLowerCase().includes(kw);
+        const catMatch = !cats.length || (f.Category || []).some(c => cats.includes(c));
+        const chanMatch = !chans.length || (f.Channels || []).some(c => chans.includes(c));
+        const geoMatch = !geos.length || (f.Countries || []).some(c => geos.includes(c));
+        return kwMatch && catMatch && chanMatch && geoMatch;
+      });
     }
 
-    function update() {
+    function updateOffers() {
       const filtered = applyFilters(offers);
-      const sorted = sortOffers(filtered);
-      renderOffers(sorted);
-      setupPagination(sorted.length, update);
+      renderOffers(filtered);
     }
+
+    function fetchData() {
+      fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=15&filterByFormula={test subset}=1`, {
+        headers: { Authorization: `Bearer ${apiKey}` }
+      })
+        .then(res => res.json())
+        .then(json => {
+          offers = json.records;
+          populateDropdowns(offers);
+          updateOffers();
+        })
+        .catch(err => {
+          document.getElementById('offers').innerHTML = '⚠️ Failed to load offers.';
+          console.error(err);
+        });
+    }
+
+    function populateDropdowns(data) {
+      const sets = { category: new Set(), channel: new Set(), country: new Set() };
+      data.forEach(r => {
+        (r.fields.Category || []).forEach(val => sets.category.add(val));
+        (r.fields.Channels || []).forEach(val => sets.channel.add(val));
+        (r.fields.Countries || []).forEach(val => sets.country.add(val));
+      });
+
+      Object.entries(sets).forEach(([key, set]) => {
+        const el = filters[key];
+        el.innerHTML = '';
+        [...set].sort().forEach(val => {
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = val;
+          el.appendChild(opt);
+        });
+      });
+    }
+
+    document.querySelectorAll('select, input').forEach(el => {
+      el.addEventListener('change', updateOffers);
+      el.addEventListener('input', updateOffers);
+    });
 
     document.getElementById('aiSuggestBtn').addEventListener('click', () => {
-      alert("🤖 AI matching applied using affiliate preferences!");
-      update();
+      alert('🤖 AI is analyzing your preferences...');
     });
 
-    async function fetchData() {
-      const res = await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}?pageSize=100`, {
-        headers: { Authorization: `Bearer ${apiKey}` }
-      });
-      const json = await res.json();
-      return json.records;
-    }
+    window.affiliatePreferences = {
+      categories: ['Health', 'CBD'],
+      channels: ['Push', 'Email'],
+      countries: ['US', 'CA']
+    };
 
-fetchData().then(data => {
-  offers = data;
-
-  const sets = { category: new Set(), channel: new Set(), country: new Set() };
-  offers.forEach(r => {
-    (r.fields.Category || []).forEach(val => sets.category.add(val));
-    (r.fields.Channels || []).forEach(val => sets.channel.add(val));
-    (r.fields.Countries || []).forEach(val => sets.country.add(val));
-  });
-
-  for (const [type, set] of Object.entries(sets)) {
-    const el = filters[type];
-    [...set].sort().forEach(val => {
-      const opt = document.createElement('option');
-      opt.value = val;
-      opt.textContent = val;
-      el.appendChild(opt);
-    });
-  }
-
-  // ✅ Render offers immediately (no scoring)
-  renderOffers(offers);
-  setupPagination(offers.length, update);
-
-  // ✅ Then fetch preferences & re-rank
-  const affiliateId = new URLSearchParams(window.location.search).get('affiliateId') || 'unknown';
-  fetch(`/api/get-affiliate-data?affiliateId=${affiliateId}`)
-    .then(res => res.json())
-    .then(data => {
-      window.affiliatePreferences = {
-        categories: data.categories || [],
-        countries: data.countries || [],
-        channels: data.channels || []
-      };
-
-      // ✅ Re-run full sort & display once AI prefs arrive
-      update();
-    })
-    .catch(err => {
-      console.warn('⚠️ Could not load affiliate preferences:', err);
-    });
-});
-
+    fetchData();
   </script>
 </body>
 </html>
+
 
