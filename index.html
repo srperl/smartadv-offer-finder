@@ -332,6 +332,24 @@ fetchAffiliatePreferences(knownAffiliateId).then(prefs => {
   });
 
   // Then fetch and show the offers
+const affiliateId = new URLSearchParams(window.location.search).get('affiliateId') || 'unknown';
+
+fetch(`/api/get-affiliate-data?affiliateId=${affiliateId}`)
+  .then(res => res.json())
+  .then(data => {
+    console.log('🎯 AI Matched Preferences:', data);
+
+    // Store preferences globally to use later in offer scoring
+    window.affiliatePreferences = {
+      categories: data.categories || [],
+      countries: data.countries || [],
+      channels: data.channels || []
+    };
+
+    // You could also trigger logic to use these for filtering here
+  })
+  .catch(err => console.error('Error loading affiliate preferences', err));
+
   fetchData().then(records => {
     offers = records;
     renderOffers(offers);
