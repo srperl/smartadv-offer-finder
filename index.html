@@ -98,6 +98,7 @@
     const baseId = 'app12gesbScGlSR9r';
     const tableName = 'Imported table';
     let offers = [];
+    let debounceTimer;
 
     const filters = {
       category: document.getElementById('categoryFilter'),
@@ -106,12 +107,12 @@
       search: document.getElementById('searchInput')
     };
 
-    function getAIScore(offer) {
+    function getAIScore(f) {
       const prefs = window.affiliatePreferences || {};
       let score = 0;
-      if ((prefs.categories || []).some(c => (offer.Category || []).includes(c))) score++;
-      if ((prefs.channels || []).some(c => (offer.Channels || []).includes(c))) score++;
-      if ((prefs.countries || []).some(c => (offer.Countries || []).includes(c))) score++;
+      if ((prefs.categories || []).some(c => (f.Category || []).includes(c))) score++;
+      if ((prefs.channels || []).some(c => (f.Channels || []).includes(c))) score++;
+      if ((prefs.countries || []).some(c => (f.Countries || []).includes(c))) score++;
       return score;
     }
 
@@ -128,8 +129,7 @@
         const highlight = ['🔥 Hot offer!', '🚀 Trending pick!', '💰 High EPC!'][i % 3];
         const score = getAIScore(f);
         const scoreLabel = score >= 2
-          ? `<p class="score-label">${score === 3 ? '💯 Perfect Match!' : '✅ Strong Match'}</p>`
-          : '';
+          ? `<p class="score-label">${score === 3 ? '💯 Perfect Match!' : '✅ Strong Match'}</p>` : '';
 
         return `
           <div class="offer-card">
@@ -207,12 +207,16 @@
       });
     }
 
-    document.querySelectorAll('select, input').forEach(el => {
+    document.querySelectorAll('select').forEach(el => {
       el.addEventListener('change', updateOffers);
-      el.addEventListener('input', updateOffers);
     });
 
-    // 🔍 AI Button Logic w/ Live Fetch
+    filters.search.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(updateOffers, 250); // debounce for 250ms
+    });
+
+    // 🔍 AI Button Logic
     document.getElementById('aiSuggestBtn').addEventListener('click', async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const affiliateId = urlParams.get('affiliateId');
@@ -244,14 +248,10 @@
       }
     });
 
-    // Temp Hardcoded Defaults (only if needed)
-    window.affiliatePreferences = {
-      categories: [],
-      channels: [],
-      countries: []
-    };
-
+    // Init default pref
+    window.affiliatePreferences = { categories: [], channels: [], countries: [] };
     fetchData();
   </script>
 </body>
 </html>
+
