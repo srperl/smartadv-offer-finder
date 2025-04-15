@@ -49,8 +49,11 @@
       border-radius: 8px;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
       font-size: 13px;
-      background-color: #f4f9fb;
     }
+    .offer-card[data-category*="Diet"] { background-color: #fff4e6; }
+    .offer-card[data-category*="Health"] { background-color: #e6f9f1; }
+    .offer-card[data-category*="Beauty"] { background-color: #fce6f3; }
+    .offer-card[data-category*="Ecomm"] { background-color: #e6f0ff; }
     .offer-card img {
       width: 100%;
       max-height: 100px;
@@ -98,7 +101,6 @@
     const baseId = 'app12gesbScGlSR9r';
     const tableName = 'Imported table';
     let offers = [];
-    let debounceTimer;
 
     const filters = {
       category: document.getElementById('categoryFilter'),
@@ -107,13 +109,29 @@
       search: document.getElementById('searchInput')
     };
 
-    function getAIScore(f) {
+    function getAIScore(offer) {
       const prefs = window.affiliatePreferences || {};
       let score = 0;
-      if ((prefs.categories || []).some(c => (f.Category || []).includes(c))) score++;
-      if ((prefs.channels || []).some(c => (f.Channels || []).includes(c))) score++;
-      if ((prefs.countries || []).some(c => (f.Countries || []).includes(c))) score++;
+      if ((prefs.categories || []).some(c => (offer.Category || []).includes(c))) score++;
+      if ((prefs.channels || []).some(c => (offer.Channels || []).includes(c))) score++;
+      if ((prefs.countries || []).some(c => (offer.Countries || []).includes(c))) score++;
       return score;
+    }
+
+    function generateHighlight(i) {
+      const lines = [
+        '💼 Built for scale and speed.',
+        '🎯 Consistently high ROI performer!',
+        '🔥 Creatives that convert like crazy.',
+        '🧲 Sticky traffic? This is your glue.',
+        '🚀 New wave affiliate goldmine.',
+        '💸 Killer EPC. Enough said.',
+        '🎉 Trusted by top traffic buyers!',
+        '📊 Proven stats. Nothing hidden.',
+        '🧪 Top split-test winner!',
+        '🏆 Audience magnet for performance pros.'
+      ];
+      return lines[i % lines.length];
     }
 
     function renderOffers(data) {
@@ -126,13 +144,13 @@
         const f = r.fields;
         const img = f['thumbnail url'] || 'https://via.placeholder.com/300x150?text=SmartADV';
         const name = f.Name || 'Untitled Offer';
-        const highlight = ['🔥 Hot offer!', '🚀 Trending pick!', '💰 High EPC!'][i % 3];
+        const highlight = generateHighlight(i);
         const score = getAIScore(f);
         const scoreLabel = score >= 2
           ? `<p class="score-label">${score === 3 ? '💯 Perfect Match!' : '✅ Strong Match'}</p>` : '';
 
         return `
-          <div class="offer-card">
+          <div class="offer-card" data-category="${(f.Category || []).join(',')}">
             <img src="${img}" alt="${name}" />
             <div><strong>#${f['Offer ID'] || 'N/A'}</strong> - ${name}</div>
             <p><strong>Category:</strong> ${(f.Category || []).join(', ')}</p>
@@ -207,16 +225,12 @@
       });
     }
 
-    document.querySelectorAll('select').forEach(el => {
+    document.querySelectorAll('select, input').forEach(el => {
       el.addEventListener('change', updateOffers);
+      el.addEventListener('input', updateOffers);
     });
 
-    filters.search.addEventListener('input', () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(updateOffers, 250); // debounce for 250ms
-    });
-
-    // 🔍 AI Button Logic
+    // AI Button Logic
     document.getElementById('aiSuggestBtn').addEventListener('click', async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const affiliateId = urlParams.get('affiliateId');
@@ -248,11 +262,13 @@
       }
     });
 
-    // Init default pref
+    // Optional fallback default
     window.affiliatePreferences = { categories: [], channels: [], countries: [] };
+
     fetchData();
   </script>
 </body>
 </html>
+
 
 
